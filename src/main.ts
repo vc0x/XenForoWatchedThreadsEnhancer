@@ -26,9 +26,11 @@ const isCached = GM_getValue('cached', false);
 const lastPageEl = document.querySelector('.pageNav-main > li:nth-last-child(1)');
 const totalPages = lastPageEl ? Number(lastPageEl.textContent) : 1;
 
-document.querySelectorAll('.pageNav-main').forEach((nav) => nav.remove());
-document.querySelector('.pageNav > a')?.remove();
-document.querySelector('.block-outer--after > .pageNavWrapper')?.remove();
+if (isCached) {
+  document.querySelectorAll('.pageNav-main').forEach((nav) => nav.remove());
+  document.querySelector('.pageNav > a')?.remove();
+  document.querySelector('.block-outer--after > .pageNavWrapper')?.remove();
+}
 
 const updatePageTitle = (title: string) => {
   const el = document.querySelector('.p-title-value');
@@ -115,61 +117,63 @@ const getUniqueLabels = (threads: WatchedThread[]) =>
     .flatMap((t) => t.labels)
     .reduce((acc: string[], curr) => (acc.includes(curr) ? acc : acc.concat(curr)), []);
 
-const container = document.querySelector('.block-container') as HTMLDivElement;
-addLabelTabsContainer(container);
-searchInput = addSearchInput(container, (input: string) => {
-  const lowercaseInput = input.toLowerCase();
+if (isCached) {
+  const container = document.querySelector('.block-container') as HTMLDivElement;
+  addLabelTabsContainer(container);
+  searchInput = addSearchInput(container, (input: string) => {
+    const lowercaseInput = input.toLowerCase();
 
-  const threads = getCachedThreads().filter((t) => {
-    return (
-      t.title.toLowerCase().indexOf(lowercaseInput) > -1 ||
-      t.labels.some((label) => label.toLowerCase().indexOf(lowercaseInput) > -1) ||
-      t.author.toLowerCase().indexOf(lowercaseInput) > -1
+    const threads = getCachedThreads().filter((t) => {
+      return (
+        t.title.toLowerCase().indexOf(lowercaseInput) > -1 ||
+        t.labels.some((label) => label.toLowerCase().indexOf(lowercaseInput) > -1) ||
+        t.author.toLowerCase().indexOf(lowercaseInput) > -1
+      );
+    });
+
+    const filteredThreads = threads.length ? threads : getCachedThreads();
+
+    queriedThreads = filteredThreads;
+
+    syncTabs(getUniqueLabels(filteredThreads), filteredThreads);
+    updateCopyThreadsButtonText(queriedThreads);
+    updateExportThreadsButtonText(queriedThreads);
+
+    updatePageTitle(
+      `Showing ${queriedThreads.length} / ${getCachedThreads().length} Watched Threads`,
     );
-  });
+  }) as HTMLInputElement;
 
-  const filteredThreads = threads.length ? threads : getCachedThreads();
+  queriedThreads = getCachedThreads();
+  updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
 
-  queriedThreads = filteredThreads;
+  syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
 
-  syncTabs(getUniqueLabels(filteredThreads), filteredThreads);
   updateCopyThreadsButtonText(queriedThreads);
   updateExportThreadsButtonText(queriedThreads);
 
-  updatePageTitle(
-    `Showing ${queriedThreads.length} / ${getCachedThreads().length} Watched Threads`,
-  );
-}) as HTMLInputElement;
+  searchInput?.focus();
 
-queriedThreads = getCachedThreads();
-updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
+  const copyThreadsText = `Copy ${queriedThreads.length} Threads`;
+  const exportThreadsText = `Export ${queriedThreads.length} Threads`;
 
-syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
+  btnCopyThreads = addButton(copyThreadsText, false, (btn) => {
+    const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
+    GM_setClipboard(threads.map((t) => t.url).join('\n'), 'text');
+    const originalText = btn.textContent;
+    btn.textContent = `Copied`;
+    setTimeout(() => (btn.textContent = originalText), 1500);
+  }) as HTMLAnchorElement;
 
-updateCopyThreadsButtonText(queriedThreads);
-updateExportThreadsButtonText(queriedThreads);
-
-searchInput?.focus();
-
-const copyThreadsText = `Copy ${queriedThreads.length} Threads`;
-const exportThreadsText = `Export ${queriedThreads.length} Threads`;
-
-btnCopyThreads = addButton(copyThreadsText, false, (btn) => {
-  const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
-  GM_setClipboard(threads.map((t) => t.url).join('\n'), 'text');
-  const originalText = btn.textContent;
-  btn.textContent = `Copied`;
-  setTimeout(() => (btn.textContent = originalText), 1500);
-}) as HTMLAnchorElement;
-
-btnExportThreads = addButton(exportThreadsText, true, (btn) => {
-  const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
-  const threadsToStr = threads.map((t) => t.url).join('\n');
-  writeTextToFile(threadsToStr, 'simpcity_watched_threads.txt');
-  const originalText = btn.textContent;
-  btn.textContent = `Exported`;
-  setTimeout(() => (btn.textContent = originalText), 1500);
-}) as HTMLAnchorElement;
+  btnExportThreads = addButton(exportThreadsText, true, (btn) => {
+    const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
+    const threadsToStr = threads.map((t) => t.url).join('\n');
+    writeTextToFile(threadsToStr, 'simpcity_watched_threads.txt');
+    const originalText = btn.textContent;
+    btn.textContent = `Exported`;
+    setTimeout(() => (btn.textContent = originalText), 1500);
+  }) as HTMLAnchorElement;
+}
 
 const dom = new DOMParser().parseFromString(originalBodyHtml, 'text/html');
 const currentPageThreads = parseThreads(dom);
@@ -194,7 +198,16 @@ if (!isCached || missingThreads.length || unreadThreads.length >= currentPageThr
   updatePageTitle('Syncing Threads...');
   await cacheAllThreads();
   GM_setValue('cached', true);
-  searchInput.value = '';
-  syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
-  updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
+  const cachedThreads = getCachedThreads();
+  syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
+  updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
+
+  if (searchInput) {
+    searchInput.value = '';
+  }
+
+  if (!isCached) {
+    // Reload on first cache.
+    window.location.reload();
+  }
 }

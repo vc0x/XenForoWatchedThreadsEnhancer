@@ -110,24 +110,24 @@
  </span>
 `;
     parent.prepend(tabHeader);
-    const container2 = document.getElementById("label-tabs-container");
-    if (container2) {
-      container2.addEventListener("wheel", (e) => {
+    const container = document.getElementById("label-tabs-container");
+    if (container) {
+      container.addEventListener("wheel", (e) => {
         e.preventDefault();
-        container2.scrollLeft += e.deltaY;
+        container.scrollLeft += e.deltaY;
       });
     }
   };
   const clearTabs = () => {
-    const container2 = document.querySelector("#label-tabs-container");
-    if (!container2) {
+    const container = document.querySelector("#label-tabs-container");
+    if (!container) {
       return;
     }
-    container2.innerHTML = "";
+    container.innerHTML = "";
   };
   const addTab = (id, label, onClick) => {
-    const container2 = document.querySelector("#label-tabs-container");
-    if (!container2) {
+    const container = document.querySelector("#label-tabs-container");
+    if (!container) {
       return;
     }
     const tab = document.createElement("a");
@@ -140,7 +140,7 @@
       e.preventDefault();
       onClick();
     });
-    container2.append(tab);
+    container.append(tab);
   };
   const activateTab = (label) => {
     const tab = document.getElementById(`label-${label.toLowerCase()}`);
@@ -160,8 +160,8 @@
     return false;
   };
   const addButton = (text, addMargin, onClick) => {
-    const container2 = document.querySelector(".pageNav--skipEnd");
-    if (!container2) {
+    const container = document.querySelector(".pageNav--skipEnd");
+    if (!container) {
       return;
     }
     const id = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
@@ -177,7 +177,7 @@
       e.preventDefault();
       onClick(btn);
     });
-    container2.append(btn);
+    container.append(btn);
     return btn;
   };
   const updateButtonText = (button, text) => {
@@ -191,9 +191,11 @@
   const isCached = _GM_getValue("cached", false);
   const lastPageEl = document.querySelector(".pageNav-main > li:nth-last-child(1)");
   const totalPages = lastPageEl ? Number(lastPageEl.textContent) : 1;
-  document.querySelectorAll(".pageNav-main").forEach((nav) => nav.remove());
-  (_a = document.querySelector(".pageNav > a")) == null ? void 0 : _a.remove();
-  (_b = document.querySelector(".block-outer--after > .pageNavWrapper")) == null ? void 0 : _b.remove();
+  if (isCached) {
+    document.querySelectorAll(".pageNav-main").forEach((nav) => nav.remove());
+    (_a = document.querySelector(".pageNav > a")) == null ? void 0 : _a.remove();
+    (_b = document.querySelector(".block-outer--after > .pageNavWrapper")) == null ? void 0 : _b.remove();
+  }
   const updatePageTitle = (title) => {
     const el = document.querySelector(".p-title-value");
     if (el) {
@@ -221,16 +223,16 @@
     return threads.filter((t) => t.labels.includes(label)).length;
   };
   const addThreads = (threads) => {
-    const container2 = document.querySelector(".structItemContainer");
-    if (!container2) {
+    const container = document.querySelector(".structItemContainer");
+    if (!container) {
       return;
     }
-    container2.innerHTML = threads.map((t) => t.raw).join("");
+    container.innerHTML = threads.map((t) => t.raw).join("");
   };
   const filterByLabel = (label, threads) => {
     const filteredThreads = threads.filter((t) => t.labels.includes(label));
-    const container2 = document.querySelector(".structItemContainer");
-    if (!container2) {
+    const container = document.querySelector(".structItemContainer");
+    if (!container) {
       return;
     }
     addThreads(filteredThreads);
@@ -259,45 +261,47 @@
     }
   };
   const getUniqueLabels = (threads) => threads.flatMap((t) => t.labels).reduce((acc, curr) => acc.includes(curr) ? acc : acc.concat(curr), []);
-  const container = document.querySelector(".block-container");
-  addLabelTabsContainer(container);
-  searchInput = addSearchInput(container, (input) => {
-    const lowercaseInput = input.toLowerCase();
-    const threads = getCachedThreads().filter((t) => {
-      return t.title.toLowerCase().indexOf(lowercaseInput) > -1 || t.labels.some((label) => label.toLowerCase().indexOf(lowercaseInput) > -1) || t.author.toLowerCase().indexOf(lowercaseInput) > -1;
+  if (isCached) {
+    const container = document.querySelector(".block-container");
+    addLabelTabsContainer(container);
+    searchInput = addSearchInput(container, (input) => {
+      const lowercaseInput = input.toLowerCase();
+      const threads = getCachedThreads().filter((t) => {
+        return t.title.toLowerCase().indexOf(lowercaseInput) > -1 || t.labels.some((label) => label.toLowerCase().indexOf(lowercaseInput) > -1) || t.author.toLowerCase().indexOf(lowercaseInput) > -1;
+      });
+      const filteredThreads = threads.length ? threads : getCachedThreads();
+      queriedThreads = filteredThreads;
+      syncTabs(getUniqueLabels(filteredThreads), filteredThreads);
+      updateCopyThreadsButtonText(queriedThreads);
+      updateExportThreadsButtonText(queriedThreads);
+      updatePageTitle(
+        `Showing ${queriedThreads.length} / ${getCachedThreads().length} Watched Threads`
+      );
     });
-    const filteredThreads = threads.length ? threads : getCachedThreads();
-    queriedThreads = filteredThreads;
-    syncTabs(getUniqueLabels(filteredThreads), filteredThreads);
+    queriedThreads = getCachedThreads();
+    updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
+    syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
     updateCopyThreadsButtonText(queriedThreads);
     updateExportThreadsButtonText(queriedThreads);
-    updatePageTitle(
-      `Showing ${queriedThreads.length} / ${getCachedThreads().length} Watched Threads`
-    );
-  });
-  queriedThreads = getCachedThreads();
-  updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
-  syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
-  updateCopyThreadsButtonText(queriedThreads);
-  updateExportThreadsButtonText(queriedThreads);
-  searchInput == null ? void 0 : searchInput.focus();
-  const copyThreadsText = `Copy ${queriedThreads.length} Threads`;
-  const exportThreadsText = `Export ${queriedThreads.length} Threads`;
-  btnCopyThreads = addButton(copyThreadsText, false, (btn) => {
-    const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
-    _GM_setClipboard(threads.map((t) => t.url).join("\n"), "text");
-    const originalText = btn.textContent;
-    btn.textContent = `Copied`;
-    setTimeout(() => btn.textContent = originalText, 1500);
-  });
-  btnExportThreads = addButton(exportThreadsText, true, (btn) => {
-    const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
-    const threadsToStr = threads.map((t) => t.url).join("\n");
-    writeTextToFile(threadsToStr, "simpcity_watched_threads.txt");
-    const originalText = btn.textContent;
-    btn.textContent = `Exported`;
-    setTimeout(() => btn.textContent = originalText, 1500);
-  });
+    searchInput == null ? void 0 : searchInput.focus();
+    const copyThreadsText = `Copy ${queriedThreads.length} Threads`;
+    const exportThreadsText = `Export ${queriedThreads.length} Threads`;
+    btnCopyThreads = addButton(copyThreadsText, false, (btn) => {
+      const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
+      _GM_setClipboard(threads.map((t) => t.url).join("\n"), "text");
+      const originalText = btn.textContent;
+      btn.textContent = `Copied`;
+      setTimeout(() => btn.textContent = originalText, 1500);
+    });
+    btnExportThreads = addButton(exportThreadsText, true, (btn) => {
+      const threads = queriedThreads.length ? queriedThreads : getCachedThreads();
+      const threadsToStr = threads.map((t) => t.url).join("\n");
+      writeTextToFile(threadsToStr, "simpcity_watched_threads.txt");
+      const originalText = btn.textContent;
+      btn.textContent = `Exported`;
+      setTimeout(() => btn.textContent = originalText, 1500);
+    });
+  }
   const dom = new DOMParser().parseFromString(originalBodyHtml, "text/html");
   const currentPageThreads = parseThreads(dom);
   const unreadThreads = currentPageThreads.filter((t) => t.unread);
@@ -317,9 +321,15 @@
     updatePageTitle("Syncing Threads...");
     await( cacheAllThreads());
     _GM_setValue("cached", true);
-    searchInput.value = "";
-    syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
-    updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
+    const cachedThreads = getCachedThreads();
+    syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
+    updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
+    if (searchInput) {
+      searchInput.value = "";
+    }
+    if (!isCached) {
+      window.location.reload();
+    }
   }
 
 })();
