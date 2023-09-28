@@ -183,6 +183,7 @@
   const updateButtonText = (button, text) => {
     button.innerHTML = text;
   };
+  let manuallySyncing = false;
   const originalBodyHtml = document.body.outerHTML;
   let queriedThreads = [];
   let btnCopyThreads = null;
@@ -300,6 +301,25 @@
       const originalText = btn.textContent;
       btn.textContent = `Exported`;
       setTimeout(() => btn.textContent = originalText, 1500);
+    });
+    addButton("Sync Threads", true, async (btn) => {
+      if (manuallySyncing) {
+        return;
+      }
+      manuallySyncing = true;
+      updatePageTitle("Syncing Threads...");
+      btn.textContent = "Syncing...";
+      await cacheAllThreads();
+      btn.textContent = "Sync Threads";
+      manuallySyncing = false;
+      const cachedThreads = getCachedThreads();
+      syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
+      updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
+      updateCopyThreadsButtonText(cachedThreads);
+      updateExportThreadsButtonText(cachedThreads);
+      if (searchInput) {
+        searchInput.value = "";
+      }
     });
   }
   const dom = new DOMParser().parseFromString(originalBodyHtml, "text/html");
