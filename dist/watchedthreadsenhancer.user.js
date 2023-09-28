@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name       watchedthreadsenhancer
+// @name       Watched Threads Enhancer
 // @namespace  https://github.com/azzlover
 // @version    1.0.0
 // @author     azzlover

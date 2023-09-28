@@ -9,6 +9,7 @@ export default defineConfig({
     monkey({
       entry: 'src/main.ts',
       userscript: {
+        name: 'Watched Threads Enhancer',
         author: 'azzlover',
         icon: 'https://simp4.jpg.church/simpcityIcon192.png',
         namespace: 'https://github.com/azzlover',
