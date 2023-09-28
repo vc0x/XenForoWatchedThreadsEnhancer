@@ -179,7 +179,7 @@ const dom = new DOMParser().parseFromString(originalBodyHtml, 'text/html');
 const currentPageThreads = parseThreads(dom);
 const unreadThreads = currentPageThreads.filter((t) => t.unread);
 const missingThreads = currentPageThreads.filter(
-  (t) => getCachedThreads().find((unread) => unread.id === t.id) === null,
+  (t) => getCachedThreads().find((cached) => cached.id === t.id) === undefined,
 );
 
 const cacheAllThreads = async () => {
