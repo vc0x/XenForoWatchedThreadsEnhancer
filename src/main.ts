@@ -202,13 +202,6 @@ if (isCached) {
   });
 }
 
-const dom = new DOMParser().parseFromString(originalBodyHtml, 'text/html');
-const currentPageThreads = parseThreads(dom);
-const unreadThreads = currentPageThreads.filter((t) => t.unread);
-const missingThreads = currentPageThreads.filter(
-  (t) => getCachedThreads().find((cached) => cached.id === t.id) === undefined,
-);
-
 const cacheAllThreads = async () => {
   const threads = [];
 
@@ -221,20 +214,13 @@ const cacheAllThreads = async () => {
   GM_setValue('watched_threads', JSON.stringify(threads));
 };
 
-if (!isCached || missingThreads.length || unreadThreads.length >= currentPageThreads.length) {
-  updatePageTitle('Syncing Threads...');
-  await cacheAllThreads();
-  GM_setValue('cached', true);
-  const cachedThreads = getCachedThreads();
-  syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
-  updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
-
-  if (searchInput) {
-    searchInput.value = '';
-  }
-
-  if (!isCached) {
-    // Reload on first cache.
-    window.location.reload();
-  }
+updatePageTitle('Syncing Threads...');
+await cacheAllThreads();
+GM_setValue('cached', true);
+const cachedThreads = getCachedThreads();
+syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
+updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
+if (!isCached) {
+  // Reload on first cache.
+  window.location.reload();
 }
