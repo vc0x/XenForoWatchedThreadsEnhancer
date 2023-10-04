@@ -1,13 +1,14 @@
 // ==UserScript==
-// @name       Watched Threads Enhancer
-// @namespace  https://github.com/azzlover
-// @version    1.0.0
-// @author     azzlover
-// @icon       https://simp4.jpg.church/simpcityIcon192.png
-// @match      https://*.simpcity.su/watched/threads*
-// @grant      GM_getValue
-// @grant      GM_setClipboard
-// @grant      GM_setValue
+// @name         Watched Threads Enhancer
+// @namespace    https://github.com/azzlover
+// @version      1.0.1
+// @author       azzlover
+// @description  Categorizes and adds search to watched threads.
+// @icon         https://simp4.jpg.church/simpcityIcon192.png
+// @match        https://*.simpcity.su/watched/threads*
+// @grant        GM_getValue
+// @grant        GM_setClipboard
+// @grant        GM_setValue
 // ==/UserScript==
 
 (async function () {
@@ -160,7 +161,7 @@
     return false;
   };
   const addButton = (text, addMargin, onClick) => {
-    const container = document.querySelector(".pageNav--skipEnd");
+    const container = document.querySelector(".pageNav");
     if (!container) {
       return;
     }
@@ -184,7 +185,6 @@
     button.innerHTML = text;
   };
   let manuallySyncing = false;
-  document.body.outerHTML;
   let queriedThreads = [];
   let btnCopyThreads = null;
   let btnExportThreads = null;

@@ -104,7 +104,7 @@ const addButton = (
   addMargin: boolean,
   onClick: { (el: HTMLAnchorElement): void },
 ) => {
-  const container = document.querySelector('.pageNav--skipEnd');
+  const container = document.querySelector('.pageNav');
 
   if (!container) {
     return;

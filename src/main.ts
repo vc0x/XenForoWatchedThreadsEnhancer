@@ -2,7 +2,6 @@ import { GM_getValue, GM_setClipboard, GM_setValue } from '$';
 
 import { cacheThreads } from './cache';
 import { writeTextToFile } from './helpers';
-import { parseThreads } from './parser';
 import { WatchedThread } from './types';
 import {
   activateTab,
@@ -15,8 +14,6 @@ import {
 } from './ui';
 
 let manuallySyncing = false;
-
-const originalBodyHtml = document.body.outerHTML;
 
 let queriedThreads: WatchedThread[] = [];
 let btnCopyThreads: null | HTMLAnchorElement = null;
