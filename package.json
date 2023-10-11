@@ -1,7 +1,7 @@
 {
   "name": "watchedthreadsenhancer",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,6 +20,7 @@
     "eslint": "^8.49.0",
     "eslint-plugin-simple-import-sort": "^10.0.0",
     "prettier": "^3.0.3",
+    "sass": "^1.69.1",
     "typescript": "^5.1.6",
     "vite": "^4.4.8",
     "vite-plugin-monkey": "^3.4.0"

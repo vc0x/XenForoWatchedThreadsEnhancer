@@ -1,5 +1,5 @@
-import { parseThreads } from './parser';
-import { WatchedThread } from './types';
+import { parseThreads } from '@/parser';
+import { WatchedThread } from '@/types';
 
 const cacheThreads = async (page: number) => {
   const parser = new DOMParser();

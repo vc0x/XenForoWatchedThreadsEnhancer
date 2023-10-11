@@ -1,4 +1,18 @@
-import { WatchedThread } from './types';
+import { WatchedThread } from '@/types';
+import {strToNumber} from "@/helpers";
+
+// https://stackoverflow.com/a/11252167
+const treatAsUTC = (date: Date) => {
+  const result = new Date(date);
+  result.setMinutes(result.getMinutes() - result.getTimezoneOffset());
+  return result;
+};
+
+const daysBetween = (startDate: Date, endDate: Date) => {
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  // @ts-ignore
+  return (treatAsUTC(endDate) - treatAsUTC(startDate)) / millisecondsPerDay;
+};
 
 const parseThreads = (el: Document | HTMLElement | HTMLBodyElement): WatchedThread[] => {
   return [...el.querySelectorAll('.structItem--thread')].map((thread: Element) => {
@@ -29,14 +43,23 @@ const parseThreads = (el: Document | HTMLElement | HTMLBodyElement): WatchedThre
       ).getAttribute('data-time') as string,
     );
 
-    const replies = (meta.querySelector('dl > dd') as HTMLDataElement).textContent;
-    const views = (meta.querySelector('dl:nth-child(2) > dd') as HTMLDataElement).textContent;
+    const replies = (meta.querySelector('dl > dd') as HTMLDataElement).textContent as string;
+    const views = (meta.querySelector('dl:nth-child(2) > dd') as HTMLDataElement)
+      .textContent as string;
 
     const lastReplyTimestamp = Number(
       (latest.querySelector('.structItem-latestDate') as HTMLTimeElement).getAttribute('data-time'),
     );
 
     const id = Number((/\d+(?=\/)/.exec(url) as RegExpExecArray)[0]);
+
+    const now = new Date();
+    const lastUpdated = new Date(lastReplyTimestamp * 1000);
+
+    const dead = daysBetween(lastUpdated, now) >= 90;
+
+    const intViews = strToNumber(views);
+    const intReplies = strToNumber(replies);
 
     return {
       id,
@@ -47,9 +70,10 @@ const parseThreads = (el: Document | HTMLElement | HTMLBodyElement): WatchedThre
       author,
       threadStartTimestamp,
       lastReplyTimestamp,
-      replies,
-      views,
+      replies: intReplies,
+      views: intViews,
       url,
+      dead,
     } as WatchedThread;
   });
 };

@@ -1,8 +1,8 @@
-import { GM_getValue, GM_setClipboard, GM_setValue } from '$';
+import '@/assets/app.scss';
 
-import { cacheThreads } from './cache';
-import { writeTextToFile } from './helpers';
-import { WatchedThread } from './types';
+import { cacheThreads } from '@/cache';
+import { strToNumber, writeTextToFile } from '@/helpers';
+import { WatchedThread } from '@/types';
 import {
   activateTab,
   addButton,
@@ -10,10 +10,15 @@ import {
   addSearchInput,
   addTab,
   clearTabs,
+  ensureButtonsContainerExist,
+  removePaginationLinks,
+  stylizeBlockContainer,
   updateButtonText,
-} from './ui';
+} from '@/ui';
+import { GM_getValue, GM_setClipboard, GM_setValue } from '$';
 
-let manuallySyncing = false;
+ensureButtonsContainerExist();
+stylizeBlockContainer();
 
 let queriedThreads: WatchedThread[] = [];
 let btnCopyThreads: null | HTMLAnchorElement = null;
@@ -26,9 +31,7 @@ const lastPageEl = document.querySelector('.pageNav-main > li:nth-last-child(1)'
 const totalPages = lastPageEl ? Number(lastPageEl.textContent) : 1;
 
 if (isCached) {
-  document.querySelectorAll('.pageNav-main').forEach((nav) => nav.remove());
-  document.querySelector('.pageNav > a')?.remove();
-  document.querySelector('.block-outer--after > .pageNavWrapper')?.remove();
+  removePaginationLinks();
 }
 
 const updatePageTitle = (title: string) => {
@@ -40,7 +43,11 @@ const updatePageTitle = (title: string) => {
 
 const getCachedThreads = () => JSON.parse(GM_getValue('watched_threads', '[]')) as WatchedThread[];
 
-const updateCopyThreadsButtonText = (threads: WatchedThread[]) => {
+const countThreadsByLabel = (label: string, threads: WatchedThread[]) => {
+  return threads.filter((t) => t.labels.includes(label)).length;
+};
+
+const syncCopyThreadsButton = (threads: WatchedThread[]) => {
   if (btnCopyThreads) {
     updateButtonText(
       btnCopyThreads,
@@ -49,17 +56,13 @@ const updateCopyThreadsButtonText = (threads: WatchedThread[]) => {
   }
 };
 
-const updateExportThreadsButtonText = (threads: WatchedThread[]) => {
+const syncExportThreadsButton = (threads: WatchedThread[]) => {
   if (btnExportThreads) {
     updateButtonText(
       btnExportThreads,
       threads.length === 1 ? 'Export Thread' : `Export ${threads.length} Threads`,
     );
   }
-};
-
-const countThreadsByLabel = (label: string, threads: WatchedThread[]) => {
-  return threads.filter((t) => t.labels.includes(label)).length;
 };
 
 const addThreads = (threads: WatchedThread[]) => {
@@ -70,6 +73,10 @@ const addThreads = (threads: WatchedThread[]) => {
   }
 
   container.innerHTML = threads.map((t) => t.raw).join('');
+
+  container.querySelectorAll('.structItem--thread').forEach((threadEl) => {
+    threadEl.classList.add('hvr-underline-from-left');
+  });
 };
 
 const filterByLabel = (label: string, threads: WatchedThread[]) => {
@@ -87,9 +94,11 @@ const syncTabs = (labels: string[], threads: WatchedThread[]) => {
   clearTabs();
 
   const unreadThreads = threads.filter((t) => t.unread);
+  const deadThreads = threads.filter((t) => t.dead);
 
   if (unreadThreads.length) {
     const unreadLabel = 'Unread';
+    addThreads(unreadThreads);
     addTab('unread', `${unreadLabel} (${unreadThreads.length})`, () => {
       addThreads(unreadThreads);
       activateTab(unreadLabel);
@@ -103,6 +112,14 @@ const syncTabs = (labels: string[], threads: WatchedThread[]) => {
       activateTab(label);
     });
   });
+
+  if (deadThreads.length) {
+    const deadLabel = 'Dead';
+    addTab('dead', `${deadLabel} (${deadThreads.length})`, () => {
+      addThreads(deadThreads);
+      activateTab(deadLabel);
+    });
+  }
 
   if (labels.length && !unreadThreads.length) {
     const activeLabel = labels[0];
@@ -120,13 +137,74 @@ if (isCached) {
   const container = document.querySelector('.block-container') as HTMLDivElement;
   addLabelTabsContainer(container);
   searchInput = addSearchInput(container, (input: string) => {
-    const lowercaseInput = input.toLowerCase();
+    const i = input.toLowerCase();
 
     const threads = getCachedThreads().filter((t) => {
+      const matchThreadPropsByOperator = (
+        thread: WatchedThread,
+        query: string,
+        operator: string,
+      ) => {
+        const matchableProps = ['views', 'replies'];
+
+        const parts = query.split(operator, 2).map((s) => s.trim());
+
+        if (parts.length !== 2) {
+          return false;
+        }
+
+        let prop = parts[0];
+        const value = parts[1];
+
+        if (prop === 'v') {
+          prop = 'views';
+        }
+
+        if (prop === 'r') {
+          prop = 'replies';
+        }
+
+        if (!matchableProps.includes(prop)) {
+          return false;
+        }
+
+        if (operator === '>=') {
+          // @ts-ignore
+          return thread[prop] >= strToNumber(value);
+        } else if (operator === '<=') {
+          // @ts-ignore
+          return thread[prop] <= strToNumber(value);
+        } else if (operator === '>') {
+          // @ts-ignore
+          return thread[prop] > strToNumber(value);
+        } else if (operator === '<') {
+          // @ts-ignore
+          return thread[prop] < strToNumber(value);
+        }
+
+        return false;
+      };
+
+      if (i.includes('>=')) {
+        return matchThreadPropsByOperator(t, i, '>=');
+      }
+
+      if (i.includes('<=')) {
+        return matchThreadPropsByOperator(t, i, '<=');
+      }
+
+      if (i.includes('>')) {
+        return matchThreadPropsByOperator(t, i, '>');
+      }
+
+      if (i.includes('<')) {
+        return matchThreadPropsByOperator(t, i, '<');
+      }
+
       return (
-        t.title.toLowerCase().indexOf(lowercaseInput) > -1 ||
-        t.labels.some((label) => label.toLowerCase().indexOf(lowercaseInput) > -1) ||
-        t.author.toLowerCase().indexOf(lowercaseInput) > -1
+        t.title.toLowerCase().indexOf(i) > -1 ||
+        t.labels.some((label) => label.toLowerCase().indexOf(i) > -1) ||
+        t.author.toLowerCase().indexOf(i) > -1
       );
     });
 
@@ -135,8 +213,8 @@ if (isCached) {
     queriedThreads = filteredThreads;
 
     syncTabs(getUniqueLabels(filteredThreads), filteredThreads);
-    updateCopyThreadsButtonText(queriedThreads);
-    updateExportThreadsButtonText(queriedThreads);
+    syncCopyThreadsButton(queriedThreads);
+    syncExportThreadsButton(queriedThreads);
 
     updatePageTitle(
       `Showing ${queriedThreads.length} / ${getCachedThreads().length} Watched Threads`,
@@ -148,8 +226,8 @@ if (isCached) {
 
   syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
 
-  updateCopyThreadsButtonText(queriedThreads);
-  updateExportThreadsButtonText(queriedThreads);
+  syncCopyThreadsButton(queriedThreads);
+  syncExportThreadsButton(queriedThreads);
 
   searchInput?.focus();
 
@@ -172,31 +250,6 @@ if (isCached) {
     btn.textContent = `Exported`;
     setTimeout(() => (btn.textContent = originalText), 1500);
   }) as HTMLAnchorElement;
-
-  addButton('Sync Threads', true, async (btn) => {
-    if (manuallySyncing) {
-      return;
-    }
-
-    manuallySyncing = true;
-
-    updatePageTitle('Syncing Threads...');
-    btn.textContent = 'Syncing...';
-    await cacheAllThreads();
-    btn.textContent = 'Sync Threads';
-
-    manuallySyncing = false;
-
-    const cachedThreads = getCachedThreads();
-    syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
-    updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
-    updateCopyThreadsButtonText(cachedThreads);
-    updateExportThreadsButtonText(cachedThreads);
-
-    if (searchInput) {
-      searchInput.value = '';
-    }
-  });
 }
 
 const cacheAllThreads = async () => {
@@ -217,6 +270,8 @@ GM_setValue('cached', true);
 const cachedThreads = getCachedThreads();
 syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
 updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
+syncCopyThreadsButton(cachedThreads);
+syncExportThreadsButton(cachedThreads);
 if (!isCached) {
   // Reload on first cache.
   window.location.reload();

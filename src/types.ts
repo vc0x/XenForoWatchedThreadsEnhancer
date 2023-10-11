@@ -6,10 +6,11 @@ type WatchedThread = {
   author: string;
   threadStartTimestamp: number;
   lastReplyTimestamp: number;
-  replies: string;
-  views: string;
+  replies: number;
+  views: number;
   url: string;
   unread: boolean;
+  dead: boolean;
 };
 
 export type { WatchedThread };

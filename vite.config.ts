@@ -10,7 +10,7 @@ export default defineConfig({
       entry: 'src/main.ts',
       userscript: {
         name: 'Watched Threads Enhancer',
-        version: '1.0.1',
+        version: '1.0.2',
         description: 'Categorizes and adds search to watched threads.',
         author: 'azzlover',
         icon: 'https://simp4.jpg.church/simpcityIcon192.png',

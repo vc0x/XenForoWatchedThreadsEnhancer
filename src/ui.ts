@@ -92,7 +92,6 @@ const activateTab = (label: string) => {
 
   if (!tab.classList.contains('is-active')) {
     tab.classList.add('is-active');
-    tab.click();
     return true;
   }
 
@@ -136,6 +135,30 @@ const updateButtonText = (button: HTMLAnchorElement, text: string) => {
   button.innerHTML = text;
 };
 
+const ensureButtonsContainerExist = () => {
+  if (!document.querySelector('.block-outer > .block-outer-main')) {
+    const blockOuterMain = document.createElement('div');
+    blockOuterMain.innerHTML = `
+<nav class="pageNavWrapper pageNavWrapper--mixed">
+  <div class="pageNav  pageNav--skipEnd">
+  </div>
+</nav>
+    `;
+    (document.querySelector('.block-outer') as HTMLDivElement).appendChild(blockOuterMain);
+  }
+};
+
+const removePaginationLinks = () => {
+  document.querySelectorAll('.pageNav-main').forEach((nav) => nav.remove());
+  document.querySelector('.pageNav > a')?.remove();
+  document.querySelector('.block-outer--after > .pageNavWrapper')?.remove();
+};
+
+const stylizeBlockContainer = () => {
+  const container = document.querySelector('.block-container') as HTMLDivElement;
+  container.style.borderRadius = '1px';
+};
+
 export {
   activateTab,
   addButton,
@@ -143,5 +166,8 @@ export {
   addSearchInput,
   addTab,
   clearTabs,
+  ensureButtonsContainerExist,
+  removePaginationLinks,
+  stylizeBlockContainer,
   updateButtonText,
 };

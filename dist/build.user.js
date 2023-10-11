@@ -1,23 +1,54 @@
 // ==UserScript==
 // @name         Watched Threads Enhancer
 // @namespace    https://github.com/azzlover
-// @version      1.0.1
+// @version      1.0.2
 // @author       azzlover
 // @description  Categorizes and adds search to watched threads.
 // @icon         https://simp4.jpg.church/simpcityIcon192.png
 // @match        https://*.simpcity.su/watched/threads*
+// @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setClipboard
 // @grant        GM_setValue
 // ==/UserScript==
 
+(t=>{if(typeof GM_addStyle=="function"){GM_addStyle(t);return}const r=document.createElement("style");r.textContent=t,document.head.append(r)})(' .structItem-pageJump a{padding:2px 8px!important;border-radius:1px!important}.hvr-grow-shadow{-webkit-transform:perspective(1px) translateZ(0);transform:perspective(1px) translateZ(0);box-shadow:0 0 1px #0000;-webkit-transition-duration:.3s;transition-duration:.3s;-webkit-transition-property:box-shadow,transform;transition-property:box-shadow,transform}.hvr-grow-shadow:hover,.hvr-grow-shadow:focus,.hvr-grow-shadow:active{box-shadow:0 10px 10px -10px #00000080;-webkit-transform:scale(1.1);transform:scale(1.1)}.hvr-underline-from-left{-webkit-transform:perspective(1px) translateZ(0);transform:perspective(1px) translateZ(0);box-shadow:0 0 1px #0000;position:relative;overflow:hidden}.hvr-underline-from-left:before{content:"";position:absolute;z-index:-1;left:0;right:100%;bottom:0;background:#3db7c7;height:2px;-webkit-transition-property:right;transition-property:right;-webkit-transition-duration:.3s;transition-duration:.3s;-webkit-transition-timing-function:ease-out;transition-timing-function:ease-out}.hvr-underline-from-left:hover:before,.hvr-underline-from-left:focus:before,.hvr-underline-from-left:active:before{right:0} ');
+
 (async function () {
   'use strict';
 
-  var _a, _b;
-  var _GM_getValue = /* @__PURE__ */ (() => typeof GM_getValue != "undefined" ? GM_getValue : void 0)();
-  var _GM_setClipboard = /* @__PURE__ */ (() => typeof GM_setClipboard != "undefined" ? GM_setClipboard : void 0)();
-  var _GM_setValue = /* @__PURE__ */ (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
+  const writeTextToFile = (data, fileName) => {
+    const a = document.createElement("a");
+    document.body.appendChild(a);
+    a.style.display = "none";
+    const blob = new Blob([data], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+  const strToNumber = (strNum) => {
+    const str = strNum.trim().toLowerCase();
+    let num;
+    if (str.includes("k")) {
+      num = Number(str.replace(/k/i, "")) * 1e3;
+    } else if (str.includes("m")) {
+      num = Number(str.replace(/m/i, "")) * 1e6;
+    } else {
+      num = Number(str);
+    }
+    return num;
+  };
+  const treatAsUTC = (date) => {
+    const result = new Date(date);
+    result.setMinutes(result.getMinutes() - result.getTimezoneOffset());
+    return result;
+  };
+  const daysBetween = (startDate, endDate) => {
+    const millisecondsPerDay = 24 * 60 * 60 * 1e3;
+    return (treatAsUTC(endDate) - treatAsUTC(startDate)) / millisecondsPerDay;
+  };
   const parseThreads = (el) => {
     return [...el.querySelectorAll(".structItem--thread")].map((thread) => {
       const unread = thread.classList.contains("is-unread");
@@ -43,6 +74,11 @@
         latest.querySelector(".structItem-latestDate").getAttribute("data-time")
       );
       const id = Number(/\d+(?=\/)/.exec(url)[0]);
+      const now = /* @__PURE__ */ new Date();
+      const lastUpdated = new Date(lastReplyTimestamp * 1e3);
+      const dead = daysBetween(lastUpdated, now) >= 90;
+      const intViews = strToNumber(views);
+      const intReplies = strToNumber(replies);
       return {
         id,
         unread,
@@ -52,9 +88,10 @@
         author,
         threadStartTimestamp,
         lastReplyTimestamp,
-        replies,
-        views,
-        url
+        replies: intReplies,
+        views: intViews,
+        url,
+        dead
       };
     });
   };
@@ -72,17 +109,6 @@
       }).catch((e) => reject(e));
     });
     return new Promise((resolve) => resolve(threads));
-  };
-  const writeTextToFile = (data, fileName) => {
-    const a = document.createElement("a");
-    document.body.appendChild(a);
-    a.style.display = "none";
-    const blob = new Blob([data], { type: "text/plain;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    window.URL.revokeObjectURL(url);
   };
   const addSearchInput = (parent, onInput) => {
     const input = document.createElement("input");
@@ -155,7 +181,6 @@
     });
     if (!tab.classList.contains("is-active")) {
       tab.classList.add("is-active");
-      tab.click();
       return true;
     }
     return false;
@@ -184,7 +209,33 @@
   const updateButtonText = (button, text) => {
     button.innerHTML = text;
   };
-  let manuallySyncing = false;
+  const ensureButtonsContainerExist = () => {
+    if (!document.querySelector(".block-outer > .block-outer-main")) {
+      const blockOuterMain = document.createElement("div");
+      blockOuterMain.innerHTML = `
+<nav class="pageNavWrapper pageNavWrapper--mixed">
+  <div class="pageNav  pageNav--skipEnd">
+  </div>
+</nav>
+    `;
+      document.querySelector(".block-outer").appendChild(blockOuterMain);
+    }
+  };
+  const removePaginationLinks = () => {
+    var _a, _b;
+    document.querySelectorAll(".pageNav-main").forEach((nav) => nav.remove());
+    (_a = document.querySelector(".pageNav > a")) == null ? void 0 : _a.remove();
+    (_b = document.querySelector(".block-outer--after > .pageNavWrapper")) == null ? void 0 : _b.remove();
+  };
+  const stylizeBlockContainer = () => {
+    const container = document.querySelector(".block-container");
+    container.style.borderRadius = "1px";
+  };
+  var _GM_getValue = /* @__PURE__ */ (() => typeof GM_getValue != "undefined" ? GM_getValue : void 0)();
+  var _GM_setClipboard = /* @__PURE__ */ (() => typeof GM_setClipboard != "undefined" ? GM_setClipboard : void 0)();
+  var _GM_setValue = /* @__PURE__ */ (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
+  ensureButtonsContainerExist();
+  stylizeBlockContainer();
   let queriedThreads = [];
   let btnCopyThreads = null;
   let btnExportThreads = null;
@@ -193,9 +244,7 @@
   const lastPageEl = document.querySelector(".pageNav-main > li:nth-last-child(1)");
   const totalPages = lastPageEl ? Number(lastPageEl.textContent) : 1;
   if (isCached) {
-    document.querySelectorAll(".pageNav-main").forEach((nav) => nav.remove());
-    (_a = document.querySelector(".pageNav > a")) == null ? void 0 : _a.remove();
-    (_b = document.querySelector(".block-outer--after > .pageNavWrapper")) == null ? void 0 : _b.remove();
+    removePaginationLinks();
   }
   const updatePageTitle = (title) => {
     const el = document.querySelector(".p-title-value");
@@ -204,7 +253,10 @@
     }
   };
   const getCachedThreads = () => JSON.parse(_GM_getValue("watched_threads", "[]"));
-  const updateCopyThreadsButtonText = (threads) => {
+  const countThreadsByLabel = (label, threads) => {
+    return threads.filter((t) => t.labels.includes(label)).length;
+  };
+  const syncCopyThreadsButton = (threads) => {
     if (btnCopyThreads) {
       updateButtonText(
         btnCopyThreads,
@@ -212,7 +264,7 @@
       );
     }
   };
-  const updateExportThreadsButtonText = (threads) => {
+  const syncExportThreadsButton = (threads) => {
     if (btnExportThreads) {
       updateButtonText(
         btnExportThreads,
@@ -220,15 +272,15 @@
       );
     }
   };
-  const countThreadsByLabel = (label, threads) => {
-    return threads.filter((t) => t.labels.includes(label)).length;
-  };
   const addThreads = (threads) => {
     const container = document.querySelector(".structItemContainer");
     if (!container) {
       return;
     }
     container.innerHTML = threads.map((t) => t.raw).join("");
+    container.querySelectorAll(".structItem--thread").forEach((threadEl) => {
+      threadEl.classList.add("hvr-underline-from-left");
+    });
   };
   const filterByLabel = (label, threads) => {
     const filteredThreads = threads.filter((t) => t.labels.includes(label));
@@ -241,8 +293,10 @@
   const syncTabs = (labels, threads) => {
     clearTabs();
     const unreadThreads = threads.filter((t) => t.unread);
+    const deadThreads = threads.filter((t) => t.dead);
     if (unreadThreads.length) {
       const unreadLabel = "Unread";
+      addThreads(unreadThreads);
       addTab("unread", `${unreadLabel} (${unreadThreads.length})`, () => {
         addThreads(unreadThreads);
         activateTab(unreadLabel);
@@ -255,6 +309,13 @@
         activateTab(label);
       });
     });
+    if (deadThreads.length) {
+      const deadLabel = "Dead";
+      addTab("dead", `${deadLabel} (${deadThreads.length})`, () => {
+        addThreads(deadThreads);
+        activateTab(deadLabel);
+      });
+    }
     if (labels.length && !unreadThreads.length) {
       const activeLabel = labels[0];
       activateTab(activeLabel.toLowerCase());
@@ -266,15 +327,55 @@
     const container = document.querySelector(".block-container");
     addLabelTabsContainer(container);
     searchInput = addSearchInput(container, (input) => {
-      const lowercaseInput = input.toLowerCase();
+      const i = input.toLowerCase();
       const threads = getCachedThreads().filter((t) => {
-        return t.title.toLowerCase().indexOf(lowercaseInput) > -1 || t.labels.some((label) => label.toLowerCase().indexOf(lowercaseInput) > -1) || t.author.toLowerCase().indexOf(lowercaseInput) > -1;
+        const matchThreadPropsByOperator = (thread, query, operator) => {
+          const matchableProps = ["views", "replies"];
+          const parts = query.split(operator, 2).map((s) => s.trim());
+          if (parts.length !== 2) {
+            return false;
+          }
+          let prop = parts[0];
+          const value = parts[1];
+          if (prop === "v") {
+            prop = "views";
+          }
+          if (prop === "r") {
+            prop = "replies";
+          }
+          if (!matchableProps.includes(prop)) {
+            return false;
+          }
+          if (operator === ">=") {
+            return thread[prop] >= strToNumber(value);
+          } else if (operator === "<=") {
+            return thread[prop] <= strToNumber(value);
+          } else if (operator === ">") {
+            return thread[prop] > strToNumber(value);
+          } else if (operator === "<") {
+            return thread[prop] < strToNumber(value);
+          }
+          return false;
+        };
+        if (i.includes(">=")) {
+          return matchThreadPropsByOperator(t, i, ">=");
+        }
+        if (i.includes("<=")) {
+          return matchThreadPropsByOperator(t, i, "<=");
+        }
+        if (i.includes(">")) {
+          return matchThreadPropsByOperator(t, i, ">");
+        }
+        if (i.includes("<")) {
+          return matchThreadPropsByOperator(t, i, "<");
+        }
+        return t.title.toLowerCase().indexOf(i) > -1 || t.labels.some((label) => label.toLowerCase().indexOf(i) > -1) || t.author.toLowerCase().indexOf(i) > -1;
       });
       const filteredThreads = threads.length ? threads : getCachedThreads();
       queriedThreads = filteredThreads;
       syncTabs(getUniqueLabels(filteredThreads), filteredThreads);
-      updateCopyThreadsButtonText(queriedThreads);
-      updateExportThreadsButtonText(queriedThreads);
+      syncCopyThreadsButton(queriedThreads);
+      syncExportThreadsButton(queriedThreads);
       updatePageTitle(
         `Showing ${queriedThreads.length} / ${getCachedThreads().length} Watched Threads`
       );
@@ -282,8 +383,8 @@
     queriedThreads = getCachedThreads();
     updatePageTitle(`Showing ${queriedThreads.length} / ${queriedThreads.length} Watched Threads`);
     syncTabs(getUniqueLabels(getCachedThreads()), getCachedThreads());
-    updateCopyThreadsButtonText(queriedThreads);
-    updateExportThreadsButtonText(queriedThreads);
+    syncCopyThreadsButton(queriedThreads);
+    syncExportThreadsButton(queriedThreads);
     searchInput == null ? void 0 : searchInput.focus();
     const copyThreadsText = `Copy ${queriedThreads.length} Threads`;
     const exportThreadsText = `Export ${queriedThreads.length} Threads`;
@@ -302,25 +403,6 @@
       btn.textContent = `Exported`;
       setTimeout(() => btn.textContent = originalText, 1500);
     });
-    addButton("Sync Threads", true, async (btn) => {
-      if (manuallySyncing) {
-        return;
-      }
-      manuallySyncing = true;
-      updatePageTitle("Syncing Threads...");
-      btn.textContent = "Syncing...";
-      await cacheAllThreads();
-      btn.textContent = "Sync Threads";
-      manuallySyncing = false;
-      const cachedThreads2 = getCachedThreads();
-      syncTabs(getUniqueLabels(cachedThreads2), cachedThreads2);
-      updatePageTitle(`Showing ${cachedThreads2.length} / ${cachedThreads2.length} Watched Threads`);
-      updateCopyThreadsButtonText(cachedThreads2);
-      updateExportThreadsButtonText(cachedThreads2);
-      if (searchInput) {
-        searchInput.value = "";
-      }
-    });
   }
   const cacheAllThreads = async () => {
     const threads = [];
@@ -337,6 +419,8 @@
   const cachedThreads = getCachedThreads();
   syncTabs(getUniqueLabels(cachedThreads), cachedThreads);
   updatePageTitle(`Showing ${cachedThreads.length} / ${cachedThreads.length} Watched Threads`);
+  syncCopyThreadsButton(cachedThreads);
+  syncExportThreadsButton(cachedThreads);
   if (!isCached) {
     window.location.reload();
   }
