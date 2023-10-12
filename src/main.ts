@@ -1,7 +1,8 @@
 import '@/assets/app.scss';
+import '@/init';
 
 import { cacheThreads } from '@/cache';
-import { strToNumber, writeTextToFile } from '@/helpers';
+import { createTooltip, strToNumber, writeTextToFile } from '@/helpers';
 import { WatchedThread } from '@/types';
 import {
   activateTab,
@@ -10,6 +11,7 @@ import {
   addSearchInput,
   addTab,
   clearTabs,
+  createInput,
   ensureButtonsContainerExist,
   removePaginationLinks,
   stylizeBlockContainer,
@@ -23,6 +25,7 @@ stylizeBlockContainer();
 let queriedThreads: WatchedThread[] = [];
 let btnCopyThreads: null | HTMLAnchorElement = null;
 let btnExportThreads: null | HTMLAnchorElement = null;
+let btnToggleThumbnailSize: null | HTMLAnchorElement = null;
 let searchInput: null | HTMLInputElement = null;
 
 const isCached = GM_getValue('cached', false);
@@ -77,6 +80,30 @@ const addThreads = (threads: WatchedThread[]) => {
   container.querySelectorAll('.structItem--thread').forEach((threadEl) => {
     threadEl.classList.add('hvr-underline-from-left');
   });
+
+  // @ts-ignore
+  if (GM_getValue('t-resized', '0') === '1') {
+    resizeThumbnails();
+  }
+};
+
+const resizeThumbnails = () => {
+  const container = document.querySelector('.structItemContainer');
+
+  if (!container) {
+    return;
+  }
+
+  container
+    .querySelectorAll('.structItem-iconContainer > a.DC_ThreadThumbnail_image')
+    .forEach((iconContainer) => {
+      const width = GM_getValue('resize-width', '250');
+      const height = GM_getValue('resize-height', '175');
+      const container = iconContainer as HTMLAnchorElement;
+      container.style.width = /\d{2,3}/.test(width) ? `${width}px` : '250px';
+      container.style.height = /\d{2,3}/.test(height) ? `${height}px` : '175px';
+      container.setAttribute('data-resized', '1');
+    });
 };
 
 const filterByLabel = (label: string, threads: WatchedThread[]) => {
@@ -140,7 +167,7 @@ if (isCached) {
     const i = input.toLowerCase();
 
     const threads = getCachedThreads().filter((t) => {
-      const matchThreadPropsByOperator = (
+      const matchThreadPropsUsingOperator = (
         thread: WatchedThread,
         query: string,
         operator: string,
@@ -186,19 +213,19 @@ if (isCached) {
       };
 
       if (i.includes('>=')) {
-        return matchThreadPropsByOperator(t, i, '>=');
+        return matchThreadPropsUsingOperator(t, i, '>=');
       }
 
       if (i.includes('<=')) {
-        return matchThreadPropsByOperator(t, i, '<=');
+        return matchThreadPropsUsingOperator(t, i, '<=');
       }
 
       if (i.includes('>')) {
-        return matchThreadPropsByOperator(t, i, '>');
+        return matchThreadPropsUsingOperator(t, i, '>');
       }
 
       if (i.includes('<')) {
-        return matchThreadPropsByOperator(t, i, '<');
+        return matchThreadPropsUsingOperator(t, i, '<');
       }
 
       return (
@@ -250,6 +277,106 @@ if (isCached) {
     btn.textContent = `Exported`;
     setTimeout(() => (btn.textContent = originalText), 1500);
   }) as HTMLAnchorElement;
+
+  btnToggleThumbnailSize = addButton('Toggle Thumbnail Size', true, (btn) => {
+    const container = document.querySelector('.structItemContainer') as HTMLDivElement;
+
+    if (GM_getValue('t-resized', '0') === '0') {
+      GM_setValue('t-resized', '1');
+    } else {
+      GM_setValue('t-resized', '0');
+    }
+
+    container
+      .querySelectorAll('.structItem-iconContainer > a.DC_ThreadThumbnail_image')
+      .forEach((iconContainer) => {
+        const container = iconContainer as HTMLAnchorElement;
+
+        if (!container.getAttribute('data-original-width')) {
+          container.setAttribute('data-original-width', '75px');
+        }
+
+        if (!container.getAttribute('data-original-height')) {
+          container.setAttribute('data-original-height', '50px');
+        }
+
+        if (container.getAttribute('data-resized')) {
+          container.style.width = container.getAttribute('data-original-width') as string;
+          container.style.height = container.getAttribute('data-original-height') as string;
+          container.removeAttribute('data-resized');
+          btn.style.color = '#8a8a8a';
+        } else {
+          const width = GM_getValue('resize-width', '250');
+          const height = GM_getValue('resize-height', '175');
+          container.style.width = /\d{2,3}/.test(width) ? `${width}px` : '250px';
+          container.style.height = /\d{2,3}/.test(height) ? `${height}px` : '175px';
+          container.setAttribute('data-resized', '1');
+          btn.style.color = '#32a42b';
+        }
+      });
+  }) as HTMLAnchorElement;
+
+  if (btnToggleThumbnailSize) {
+    // @ts-ignore
+    const resized = GM_getValue('t-resized', '0') === '1';
+
+    if (resized) {
+      btnToggleThumbnailSize.style.color = '#32a42b';
+    }
+
+    const width = GM_getValue('resize-width', '250');
+    const height = GM_getValue('resize-height', '175');
+
+    const widthInput = createInput('resize-width', 'Width', width, 'transparent', width);
+    const heightInput = createInput('resize-height', 'Height', height, 'transparent', width);
+
+    const form = `
+      ${widthInput}
+      ${heightInput}
+    `;
+
+    // noinspection JSUnusedGlobalSymbols
+    createTooltip(
+      btnToggleThumbnailSize,
+      `
+<form
+  id="downloader-page-config-form"
+  class="menu-content"
+  style="padding: 5px 10px; background: #2a2929;width:300px; min-width: 300px;"
+>
+    ${form}
+</form>
+    `,
+      {
+        offset: [null, 20],
+        onShown: () => {
+          const widthEl = document.querySelector('#resize-width');
+          const heightEl = document.querySelector('#resize-height');
+
+          if (widthEl && heightEl) {
+            widthEl.addEventListener('input', (e) => {
+              GM_setValue('resize-width', (e.target as HTMLInputElement).value);
+              // @ts-ignore
+              const resize = GM_getValue('t-resized', '0') === '1';
+              console.log(resize);
+              if (resize) {
+                resizeThumbnails();
+              }
+            });
+            heightEl.addEventListener('input', (e) => {
+              GM_setValue('resize-height', (e.target as HTMLInputElement).value);
+              // @ts-ignore
+              const resize = GM_getValue('t-resized', '0') === '1';
+              console.log(resize);
+              if (resize) {
+                resizeThumbnails();
+              }
+            });
+          }
+        },
+      },
+    );
+  }
 }
 
 const cacheAllThreads = async () => {

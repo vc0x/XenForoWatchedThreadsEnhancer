@@ -1,7 +1,7 @@
 {
   "name": "watchedthreadsenhancer",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,5 +24,8 @@
     "typescript": "^5.1.6",
     "vite": "^4.4.8",
     "vite-plugin-monkey": "^3.4.0"
+  },
+  "dependencies": {
+    "tippy.js": "^6.3.7"
   }
 }

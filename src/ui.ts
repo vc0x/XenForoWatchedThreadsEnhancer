@@ -159,6 +159,32 @@ const stylizeBlockContainer = () => {
   container.style.borderRadius = '1px';
 };
 
+const createInput = (
+  id: string,
+  label: string,
+  currentValue: string,
+  backgroundColor: string = 'transparent',
+  placeholder?: string,
+) => {
+  return `
+    <div class="menu-row">
+      <div style="font-weight: bold; margin-top:2px; margin-bottom: 8px; color: dodgerblue;">
+          ${label}
+      </div>
+      <input
+        id="${id}"
+        type="text"
+        style="background: ${backgroundColor};"
+        class="input"
+        autocomplete="off"
+        name="keywords"
+        placeholder="${placeholder}"
+        value="${currentValue}"
+      />
+    </div>
+  `;
+};
+
 export {
   activateTab,
   addButton,
@@ -166,6 +192,7 @@ export {
   addSearchInput,
   addTab,
   clearTabs,
+  createInput,
   ensureButtonsContainerExist,
   removePaginationLinks,
   stylizeBlockContainer,

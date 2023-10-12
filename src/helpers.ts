@@ -1,3 +1,7 @@
+import 'tippy.js/dist/tippy.css';
+
+import tippy from 'tippy.js';
+
 // https://stackoverflow.com/a/64500313
 const writeTextToFile = (data: string, fileName: string) => {
   const a = document.createElement('a');
@@ -25,4 +29,17 @@ const strToNumber = (strNum: string) => {
   return num;
 };
 
-export { strToNumber, writeTextToFile };
+const createTooltip = (target: HTMLElement, content: string, options: any = {}) => {
+  return tippy(target, {
+    arrow: true,
+    theme: 'transparent',
+    allowHTML: true,
+    content: content,
+    appendTo: () => document.body,
+    placement: 'right',
+    interactive: true,
+    ...options,
+  });
+};
+
+export { createTooltip, strToNumber, writeTextToFile };
